@@ -4,6 +4,10 @@
 
 Roku Tv Remote and classes related to roku tv development
 
+# Problems
+- wwake on lan power button
+- requires manual ip address programming
+- no extension beyond basic info and tv control
 
 ![reokuapp](https://github.com/Donny-GUI/roku-python/assets/108424001/af4e857e-aabc-40ce-bc62-4769c60a34ce)
 
