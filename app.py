@@ -1,20 +1,34 @@
+
+print("init")
 import customtkinter as ctk
 from remote import RokuRemote
 from threading import Thread
 import socket
 from lib import ButtonText, Arrow
-from network import MacAddress, LocalNetwork
 from lib import to_char, to_key, keys, keycodes, ping_device
+import subprocess
+import os
+import atexit
+from pprint import pprint
 
+
+CWD = os.getcwd()
+NETENUM_EXE = os.path.join(CWD, "network_enumerator.exe")
+NETENUM_PY = os.path.join(CWD, "network_enumerator.py")
+CMD = f"python {NETENUM_PY}"
 
 class RokuRemoteApp(ctk.CTk):
     
     def __init__(self) -> None:
+        print("loading")
         super().__init__()
-        self.network = LocalNetwork()
+        self.network = {}
+        #self.read_files()
+        #self.network_enumerator = subprocess.Popen([CMD], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        #self.network_enumerator = subprocess.Popen([NETENUM_EXE], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        atexit.register(self.cleanup)
         
         self.remote = RokuRemote("192.168.50.166")
-        self.ip_range = self.network.get_ip()
         self.devices = []
         self.addresses = []
         self.Keys = []
@@ -203,7 +217,7 @@ class RokuRemoteApp(ctk.CTk):
         self.address_button.grid(row=2, column=0, pady=5, padx=(10,5), sticky='W')
         
         # address entry box
-        self.address_box = ctk.CTkEntry(self.set_address_frame, placeholder_text=self.ip_range, width=100)
+        self.address_box = ctk.CTkEntry(self.set_address_frame,  width=100)
         self.basic_address = "192.168.50."
         for index, i in enumerate(self.basic_address):
             self.address_box.insert(index, i)
@@ -262,8 +276,36 @@ class RokuRemoteApp(ctk.CTk):
         self.bindings["Down Arrow"] = self.remote.down
         self.bindings["Space"] = self.remote.select
 
+        self.read_files()
         self.mainloop()
 
+    def cleanup(self):
+        self.network_enumerator.terminate()
+    
+    def read_files(self):
+        files = [x for x in os.listdir(CWD) if x.startswith("network_addresses")]
+        paths = [os.path.join(CWD, x) for x in files]
+        for path in paths:
+            with open(path, 'r') as rfile:
+                lines = rfile.readlines()
+            for line in lines:
+                addr, name = line.split("\t")
+                na = name.strip("\n")
+                self.network[addr] = na
+            os.remove(path)
+        pprint(self.network)
+        self.after(5000, self.enumerate_network)
+        self.after(10000, self.read_files)
+    
+    def enumerate_network(self):
+        self.network_enumerator = subprocess.Popen([NETENUM_EXE], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+    def remove_files(self):
+        files = [x for x in os.listdir(CWD) if x.startswith("network_addresses")]
+        paths = [os.path.join(CWD, x) for x in files]
+        for path in paths:
+            os.remove(path)
+        
     def device_selected_from_combo(self, event):
         selected_item = self.device_combo_box.get()
         self.remote.set_device(selected_item)
@@ -310,12 +352,11 @@ class RokuRemoteApp(ctk.CTk):
         address = self.address_box.get()
         self.remote.set_device(address)
     
-    def wake_up(self, args):
+    def wake_up(self, mac_address):
         """takes the remote address and gets the mac address of the device, 
         then creates a magic packet and sends it to the network
         """
-        self.mac_address = MacAddress(self.remote._address).get()
-        print(self.mac_address)
+    
         mac_parts = self.mac_address.split(":")
         mac_bytes = [int(part, 16) for part in mac_parts]
         magic_packet = b'\xFF' * 6 + (b''.join(mac_bytes) * 16)
@@ -331,7 +372,7 @@ class RokuRemoteApp(ctk.CTk):
         if function is not None:
             function()
 
-
-
-remote = RokuRemoteApp()
+if __name__ == '__main__':
+    print("main")
+    remote = RokuRemoteApp()
 
